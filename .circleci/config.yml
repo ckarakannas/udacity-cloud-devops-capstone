@@ -28,7 +28,47 @@ jobs:
           command: |
             . ~/.cex-api/bin/activate
             make lint
+  deploy-docker-image:
+    docker:
+      - image: cimg/node:12.22.1
+        auth:
+          username: chrisk14
+          password: $DOCKERHUB_PASSWORD
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: 20.10.6
+      - run:
+          name: Install Postman newman CLI
+          command: |
+            npm install -g newman
+      - run:
+          name: Build and run docker image in detached mode
+          command: |
+            chmod +x run_docker.sh
+            ./run_docker.sh
+      - run:
+          name: Test that Docker container is up and running
+          command: |
+            if docker exec $(cat container_id.log) curl --retry 10 --retry-connrefused http://localhost:5000 | grep -s "PRODUCTION"
+            then
+              echo "Dockerized Flask app is up and running!"
+            else
+              echo "ERROR: Docker app is down! Exiting..."
+              exit 1
+            fi
+      - run:
+          name: Test postman collection
+          command: |
+            make test
+      - run:
+          name: Upload Docker image to DockerHub
+          command: |
+            chmod +x upload_docker.sh
+            ./upload_docker.sh           
 workflows:
   default:
     jobs:
       - build
+      - deploy-docker-image:
+          requires: [build]
