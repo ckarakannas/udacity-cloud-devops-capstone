@@ -39,10 +39,6 @@ jobs:
       - setup_remote_docker:
           version: 20.10.6
       - run:
-          name: Install Postman newman CLI
-          command: |
-            npm install -g newman
-      - run:
           name: Build and run docker image in detached mode
           command: |
             chmod +x run_docker.sh
@@ -57,10 +53,6 @@ jobs:
               echo "ERROR: Docker app is down! Exiting..."
               exit 1
             fi
-      - run:
-          name: Test postman collection
-          command: |
-            make test
       - run:
           name: Upload Docker image to DockerHub
           command: |
