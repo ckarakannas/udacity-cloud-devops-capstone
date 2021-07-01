@@ -1,5 +1,5 @@
 from ma import ma
-from marshmallow import pre_load, post_load, post_dump, EXCLUDE, validate, ValidationError
+from marshmallow import pre_load, post_load, post_dump, EXCLUDE, validate
 from models.exchange import ExchangeModel
 
 
