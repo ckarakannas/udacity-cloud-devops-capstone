@@ -31,9 +31,6 @@ jobs:
   deploy-docker-image:
     docker:
       - image: cimg/node:12.22.1
-        auth:
-          username: chrisk14
-          password: $DOCKERHUB_PASSWORD
     steps:
       - checkout
       - setup_remote_docker:
@@ -54,10 +51,10 @@ jobs:
               exit 1
             fi
       - run:
-          name: Upload Docker image to DockerHub
+          name: Authenticate and upload Docker image to DockerHub
           command: |
-            chmod +x upload_docker.sh
-            ./upload_docker.sh           
+            echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            docker push ${DOCKERHUB_USERNAME}/currency-exchange:prod         
 workflows:
   default:
     jobs:
