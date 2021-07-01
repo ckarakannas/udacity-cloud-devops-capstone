@@ -4,5 +4,3 @@ Flask-RESTful==0.3.8
 marshmallow==3.10.0
 pytz==2020.5
 setuptools
-wheel
-pip

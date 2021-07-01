@@ -1,9 +1,2 @@
 -r common.txt
 pylint
-toml
-astroid
-MarkupSafe
-isort
-mccabe
-autopep8
-pycodestyle
