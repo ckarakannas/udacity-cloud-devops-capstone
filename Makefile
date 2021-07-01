@@ -12,11 +12,11 @@ install:
 
 lint-docker-hadolint:
 	docker run --rm -i hadolint/hadolint < Dockerfile
-	find . -type f -name "*.py" | xargs pylint --disable=R,C
+	find . -type f -name "*.py" | xargs pylint --disable=R,C,W0613
 
 lint:
 	hadolint Dockerfile
-	find . -type f -name "*.py" | xargs pylint --disable=R,C
+	find . -type f -name "*.py" | xargs pylint --disable=R,C,W0613
 
 test:
 	newman run postman/CEX-API-Collection-Tests.postman_collection.json \

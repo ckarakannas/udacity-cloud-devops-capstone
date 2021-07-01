@@ -5,10 +5,9 @@ from resources.exchange import Exchange, SingleBaseExchange, ExchangeMultiple
 from resources.rates import SingleBaseRates, RatesList
 from ma import ma
 from marshmallow import ValidationError
-from load_rates import rates_data
 
 app = Flask(__name__)
-app.config.from_object('config')
+app.config.from_object(config)
 app.config['BUNDLE_ERRORS'] = True
 api = Api(app)
 

@@ -7,6 +7,7 @@ try:
         data = json.load(f)
         if not isinstance(data, list):
             data = [data]
+        rates_data = {}
         rates_data = rates_list_schema.load(data)
 except IOError:
     print("Could not read file:", f_name)
