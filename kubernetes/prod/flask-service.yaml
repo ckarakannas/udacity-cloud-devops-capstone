@@ -7,6 +7,6 @@ spec:
   ports:
     - port: 5000
       targetPort: 5000
-      nodePort: 32050
+      nodePort: 32500
   selector:
     app: cex-api-prod
