@@ -1,0 +1,43 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  IAM role for serviceaccount "kube-system/aws-node
+Parameters:
+  EnvironmentName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+    Default: UdacityCapstone
+Resources:
+  AmazonEKSCNIRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AmazonEKSCNIRole
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRoleWithWebIdentity
+          Condition:
+            StringEquals:
+              oidc.eks.eu-west-2.amazonaws.com/id/8ADDEFFA81E735E3BEEC8F2729796C1B:aud: sts.amazonaws.com
+              oidc.eks.eu-west-2.amazonaws.com/id/8ADDEFFA81E735E3BEEC8F2729796C1B:sub: system:serviceaccount:kube-system:aws-node
+          Effect: Allow
+          Principal:
+            Federated:
+              Fn::Sub:
+                arn:aws:iam::${AWS::AccountId}:oidc-provider/oidc.eks.eu-west-2.amazonaws.com/id/8ADDEFFA81E735E3BEEC8F2729796C1B
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+  CNIAddon:
+    Type: AWS::EKS::Addon
+    Properties:
+      AddonName: vpc-cni
+      ClusterName: udacity-cluster
+      ResolveConflicts: OVERWRITE
+      ServiceAccountRoleArn:
+        Fn::GetAtt: AmazonEKSCNIRole.Arn
+Outputs:
+  AmazonEKSCNIRoleArn:
+    Value:
+      Fn::GetAtt: AmazonEKSCNIRole.Arn
+

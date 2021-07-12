@@ -1,0 +1,282 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Udacity Capstone Project - EKS Network Stack
+Parameters:
+  EnvironmentName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+    Default: UdacityCapstone
+  UdacityVpcCIDR:
+    Type: String
+    Default: 192.168.0.0/16
+    Description: The CIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range.
+  PublicSubnet1CIDR:
+    Description: IP range for the public subnet in the first Availability Zone
+    Type: String
+    Default: 192.168.0.0/24
+  PublicSubnet2CIDR:
+    Description: IP range for the public subnet in the second Availability Zone
+    Type: String
+    Default: 192.168.1.0/24
+  PrivateSubnet1CIDR:
+    Description: IP range for the private subnet in the first Availability Zone
+    Type: String
+    Default: 192.168.2.0/24
+  PrivateSubnet2CIDR:
+    Description: IP range for the private subnet in the second Availability Zone
+    Type: String
+    Default: 192.168.3.0/24
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Worker Network Configuration"
+        Parameters:
+          - UdacityVpcCIDR
+          - PublicSubnet1CIDR
+          - PublicSubnet2CIDR
+          - PrivateSubnet1CIDR
+          - PrivateSubnet2CIDR
+Resources:
+  ## VPC
+  UdacityVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref UdacityVpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-VPC"
+  ## Subnets
+  PublicSubnet01:
+    Type: AWS::EC2::Subnet
+    Metadata:
+      Comment: Subnet 01
+    Properties:
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      VpcId: !Ref UdacityVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-PublicSubnet01"
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: kubernetes.io/cluster/udacity-cluster
+          Value: shared
+
+  PublicSubnet02:
+    Type: AWS::EC2::Subnet
+    Metadata:
+      Comment: Subnet 02
+    Properties:
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      VpcId: !Ref UdacityVPC
+      CidrBlock: !Ref PublicSubnet2CIDR
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-PublicSubnet02"
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: kubernetes.io/cluster/udacity-cluster
+          Value: shared
+
+  PrivateSubnet01:
+    Type: AWS::EC2::Subnet
+    Metadata:
+      Comment: Subnet 03
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      VpcId: !Ref UdacityVPC
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-PrivateSubnet01"
+        - Key: kubernetes.io/role/internal-elb
+          Value: "1"
+
+  PrivateSubnet02:
+    Type: AWS::EC2::Subnet
+    Metadata:
+      Comment: Private Subnet 02
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      VpcId: !Ref UdacityVPC
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-PrivateSubnet02"
+        - Key: kubernetes.io/role/internal-elb
+          Value: "1"
+  ## Gateways
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-InternetGateway
+
+  VPCGatewayAttachment:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref UdacityVPC
+
+  NatGatewayEIP1:
+    DependsOn:
+      - VPCGatewayAttachment
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-NatGatewayEIP-AZ1
+
+  NatGatewayEIP2:
+    DependsOn:
+      - VPCGatewayAttachment
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-NatGatewayEIP-AZ2
+
+  NatGateway01:
+    DependsOn:
+      - VPCGatewayAttachment
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt "NatGatewayEIP1.AllocationId"
+      SubnetId: !Ref PublicSubnet01
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-NatGatewayAZ1"
+
+  NatGateway02:
+    DependsOn:
+      - VPCGatewayAttachment
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt "NatGatewayEIP2.AllocationId"
+      SubnetId: !Ref PublicSubnet02
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-NatGatewayAZ2"
+  ## Routes
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref UdacityVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-PublicRouteTable
+        - Key: Network
+          Value: Public
+
+  PrivateRouteTable01:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref UdacityVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-PrivateRouteTable-AZ1
+        - Key: Network
+          Value: Private01
+
+  PrivateRouteTable02:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref UdacityVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-PrivateRouteTable-AZ2
+        - Key: Network
+          Value: Private02
+
+  PublicRoute:
+    DependsOn: VPCGatewayAttachment
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PrivateRoute01:
+    DependsOn:
+      - VPCGatewayAttachment
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable01
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway01
+
+  PrivateRoute02:
+    DependsOn:
+      - VPCGatewayAttachment
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable02
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway02
+
+  PublicSubnet01RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet01
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet02RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet02
+      RouteTableId: !Ref PublicRouteTable
+
+  PrivateSubnet01RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet01
+      RouteTableId: !Ref PrivateRouteTable01
+
+  PrivateSubnet02RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet02
+      RouteTableId: !Ref PrivateRouteTable02
+
+Outputs:
+  SubnetIds:
+    Description: Subnets IDs in the VPC
+    Value:
+      !Join [
+        ",",
+        [
+          !Ref PublicSubnet01,
+          !Ref PublicSubnet02,
+          !Ref PrivateSubnet01,
+          !Ref PrivateSubnet02,
+        ],
+      ]
+    Export:
+      Name: !Sub ${EnvironmentName}-SubnetIDs
+
+  VpcId:
+    Description: The VPC Id
+    Value: !Ref UdacityVPC
+    Export:
+      Name: !Sub ${EnvironmentName}-VPCID
+
+  PublicSubnets:
+    Description: List of the public subnets
+    Value: !Join [",", [!Ref PublicSubnet01, !Ref PublicSubnet02]]
+    Export:
+      Name: !Sub ${EnvironmentName}-Public-NETS
+
+  PrivateSubnets:
+    Description: List of the private subnets
+    Value: !Join [",", [!Ref PrivateSubnet01, !Ref PrivateSubnet02]]
+    Export:
+      Name: !Sub ${EnvironmentName}-Private-NETS
