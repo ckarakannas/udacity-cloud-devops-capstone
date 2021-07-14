@@ -177,6 +177,27 @@ jobs:
           name: Check that AWS controller is running
           command: |
             kubectl get deployment -n kube-system aws-load-balancer-controller
+  deploy-app:
+    docker:
+      - image: cimg/base:2021.07
+    steps: 
+      - checkout
+      - aws-cli/install
+      - aws-eks/install-eksctl
+      - kubernetes/install-kubectl
+      - run:
+          name: Apply kubernetes resources in rolling update fashion
+          command: |
+            # We can persist kubeconfig instead of having to update it all the time
+            # persist workspace at ~/.kube , path config
+            aws eks update-kubeconfig \
+              --region eu-west-2 \
+              --name udacity-cluster
+            
+            cd kubernetes/prod
+            kubectl apply -f flask-deployment.yaml
+            kubectl apply -f flask-service.yaml
+            kubectl apply -f ingress.yml
 
 workflows:
   default:
@@ -188,3 +209,5 @@ workflows:
           requires: [deploy-docker-image]
       - configure-infrastructure:
           requires: [deploy-infrastructure]
+      - deploy-app:
+          requires: [configure-infrastructure]
