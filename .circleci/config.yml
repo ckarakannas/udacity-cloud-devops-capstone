@@ -157,7 +157,7 @@ jobs:
       - run:
           name: Deploy AWS Load Balancer Controller, if not already deployed
           command: |
-            if ! (( kubectl get deployment -n kube-system aws-load-balancer-controller )) ; then
+            if ! ( kubectl get deployment -n kube-system aws-load-balancer-controller ) ; then
               eksctl create iamserviceaccount \
                 --cluster=udacity-cluster \
                 --namespace=kube-system \
