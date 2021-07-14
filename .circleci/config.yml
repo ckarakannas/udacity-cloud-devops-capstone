@@ -83,7 +83,8 @@ jobs:
       #       mv ./kubectl ~/.local/bin/kubectl
       #       echo "export PATH=~/.local/bin/kubectl:$PATH" >> $BASH_ENV
       - run:
-          name: Deploy EKS Cluster, Network & Cluster Cloudformation Stacks
+          name: Deploy EKS Cluster, Network & Cluster Cloudformation 
+          no_output_timeout: 25m
           command: |
             cd .circleci/cloudformation
 
@@ -118,6 +119,7 @@ jobs:
               --override-existing-serviceaccounts
       - run:
           name: Deploy EKS Nodegroup (Private Subnets)
+          no_output_timeout: 15m
           command: |
             ./deploy-stack.sh -n udacity-capstone-nodegroup \
               -f stacks/nodegroup.yml -c \
