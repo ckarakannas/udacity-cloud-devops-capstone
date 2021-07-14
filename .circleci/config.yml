@@ -1,4 +1,8 @@
 version: 2.1
+orbs:
+  aws-cli: circleci/aws-cli@2.0.3
+  kubernetes: circleci/kubernetes@0.12.0
+  aws-eks: circleci/aws-eks@1.1.0
 jobs:
   build:
     docker:
@@ -30,7 +34,7 @@ jobs:
             make lint
   deploy-docker-image:
     docker:
-      - image: cimg/node:12.22.1
+      - image: cimg/base:2021.07
     steps:
       - checkout
       - setup_remote_docker:
@@ -57,25 +61,27 @@ jobs:
             docker push ${DOCKERHUB_USERNAME}/currency-exchange:prod
   deploy-infrastructure:
     docker:
-      # Using custom aws-cli image that supports tar utility
-      - image: mikesir87/aws-cli
+      - image: cimg/base:2021.07
     steps: 
       - checkout
-      - run:
-          name: Install eksctl CLI
-          command: |
-            curl --silent \
-              --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-            sudo mv /tmp/eksctl /usr/local/bin
-            eksctl version
-      - run:
-          name: Install kubectl and export it to path
-          command: |
-            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-            chmod +x kubectl
-            mkdir -p ~/.local/bin/kubectl
-            mv ./kubectl ~/.local/bin/kubectl
-            echo "export PATH=~/.local/bin/kubectl:$PATH" >> $BASH_ENV
+      - aws-cli/install
+      - aws-eks/install-eksctl
+      - kubernetes/install-kubectl
+      # - run:
+      #     name: Install eksctl CLI
+      #     command: |
+      #       curl --silent \
+      #         --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+      #       sudo mv /tmp/eksctl /usr/local/bin
+      #       eksctl version
+      # - run:
+      #     name: Install kubectl and export it to path
+      #     command: |
+      #       curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      #       chmod +x kubectl
+      #       mkdir -p ~/.local/bin/kubectl
+      #       mv ./kubectl ~/.local/bin/kubectl
+      #       echo "export PATH=~/.local/bin/kubectl:$PATH" >> $BASH_ENV
       - run:
           name: Deploy EKS Cluster, Network & Cluster Cloudformation Stacks
           command: |
@@ -116,28 +122,31 @@ jobs:
             ./deploy-stack.sh -n udacity-capstone-nodegroup \
               -f stacks/nodegroup.yml -c \
               -t "project=udacity-capstone workflow=${CIRCLE_WORKFLOW_ID}"
-      - persist_to_workspace:
-          root:  ~/.local/bin
-          paths:
-            - kubectl
+      # - persist_to_workspace:
+      #     root:  ~/.local/bin
+      #     paths:
+      #       - kubectl
   configure-infrastructure:
     docker:
-      - image: mikesir87/aws-cli
-    steps:
+      - image: cimg/base:2021.07
+    steps: 
       - checkout
-      - run:
-          name: Install eksctl CLI
-          command: |
-            curl --silent \
-              --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-            sudo mv /tmp/eksctl /usr/local/bin
-            eksctl version
-      - attach_workspace:
-          at: ~/.local/bin
+      - aws-cli/install
+      - aws-eks/install-eksctl
+      - kubernetes/install-kubectl
+      # - run:
+      #     name: Install eksctl CLI
+      #     command: |
+      #       curl --silent \
+      #         --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+      #       sudo mv /tmp/eksctl /usr/local/bin
+      #       eksctl version
+      # - attach_workspace:
+      #     at: ~/.local/bin
       - run:
           name: Export path for kubectl
           command: |
-            echo "export PATH=~/.local/bin/kubectl:$PATH" >> $BASH_ENV
+            # echo "export PATH=~/.local/bin/kubectl:$PATH" >> $BASH_ENV
             aws eks update-kubeconfig \
               --region eu-west-2 \
               --name udacity-cluster
