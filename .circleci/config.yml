@@ -54,10 +54,124 @@ jobs:
           name: Authenticate and upload Docker image to DockerHub
           command: |
             echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            docker push ${DOCKERHUB_USERNAME}/currency-exchange:prod         
+            docker push ${DOCKERHUB_USERNAME}/currency-exchange:prod
+  deploy-infrastructure:
+    docker:
+      # Using custom aws-cli image that supports tar utility
+      - image: mikesir87/aws-cli
+    steps: 
+      - checkout
+      - run:
+          name: Install eksctl CLI
+          command: |
+            curl --silent \
+              --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+            sudo mv /tmp/eksctl /usr/local/bin
+            eksctl version
+      - run:
+          name: Install kubectl and export it to path
+          command: |
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            mkdir -p ~/.local/bin/kubectl
+            mv ./kubectl ~/.local/bin/kubectl
+            echo "export PATH=~/.local/bin/kubectl:$PATH" >> $BASH_ENV
+      - run:
+          name: Deploy EKS Cluster, Network & Cluster Cloudformation Stacks
+          command: |
+            cd .circleci/cloudformation
+
+            ./deploy-stack.sh -n udacity-capstone-network \
+              -f stacks/network.yml \
+              -t "project=udacity-capstone workflow=${CIRCLE_WORKFLOW_ID}"
+
+            ./deploy-stack.sh -n udacity-capstone-cluster \
+              -f stacks/cluster.yml -c \
+              -t "project=udacity-capstone workflow=${CIRCLE_WORKFLOW_ID}"
+      - run:
+          name: Update kubeconfig and check that svc is running
+          command: |
+            aws eks update-kubeconfig \
+              --region eu-west-2 \
+              --name udacity-cluster
+  
+            kubectl get svc
+      - run:
+          name: Associate OIDC provider with EKS cluster, if not already associated
+          command: |
+            eksctl utils associate-iam-oidc-provider --cluster udacity-cluster --approve
+      - run:
+          name: Create service account and attach CNI addon
+          command: |
+            eksctl create iamserviceaccount \
+              --name aws-node \
+              --namespace kube-system \
+              --cluster udacity-cluster \
+              --attach-policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy \
+              --approve \
+              --override-existing-serviceaccounts
+      - run:
+          name: Deploy EKS Nodegroup (Private Subnets)
+          command: |
+            ./deploy-stack.sh -n udacity-capstone-nodegroup \
+              -f stacks/nodegroup.yml -c \
+              -t "project=udacity-capstone workflow=${CIRCLE_WORKFLOW_ID}"
+      - persist_to_workspace:
+          root:  ~/.local/bin
+          paths:
+            - kubectl
+  configure-infrastructure:
+    docker:
+      - image: mikesir87/aws-cli
+    steps:
+      - checkout
+      - run:
+          name: Install eksctl CLI
+          command: |
+            curl --silent \
+              --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+            sudo mv /tmp/eksctl /usr/local/bin
+            eksctl version
+      - attach_workspace:
+          at: ~/.local/bin
+      - run:
+          name: Export path for kubectl
+          command: |
+            echo "export PATH=~/.local/bin/kubectl:$PATH" >> $BASH_ENV
+            aws eks update-kubeconfig \
+              --region eu-west-2 \
+              --name udacity-cluster
+      - run:
+          name: Deploy AWS Load Balancer Controller, if not already deployed
+          command: |
+            if ! (( kubectl get deployment -n kube-system aws-load-balancer-controller )) ; then
+              eksctl create iamserviceaccount \
+                --cluster=udacity-cluster \
+                --namespace=kube-system \
+                --name=aws-load-balancer-controller \
+                --attach-policy-arn=arn:aws:iam::${AWS_Account_Id}:policy/AWSLoadBalancerControllerIAMPolicy \
+                --override-existing-serviceaccounts \
+                --approve
+              
+              kubectl apply \
+                  --validate=false \
+                  -f https://github.com/jetstack/cert-manager/releases/download/v1.1.1/cert-manager.yaml
+              
+              cd kubernetes/
+              kubectl apply -f aws-load-balancer-controller-v2.2.0.yaml
+            fi
+      - run:
+          name: Check that AWS controller is running
+          command: |
+            kubectl get deployment -n kube-system aws-load-balancer-controller
+
 workflows:
   default:
     jobs:
       - build
       - deploy-docker-image:
           requires: [build]
+      - deploy-infrastructure:
+          requires: [deploy-docker-image]
+      - configure-infrastructure:
+          requires: [deploy-infrastructure]

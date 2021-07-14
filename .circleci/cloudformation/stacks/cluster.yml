@@ -107,7 +107,9 @@ Resources:
         Ref: ClusterSharedNodeSecurityGroup
       IpProtocol: "-1"
       SourceSecurityGroupId:
-        Ref: ControlPlaneSecurityGroup
+        Fn::GetAtt:
+          - ControlPlane
+          - ClusterSecurityGroupId
       ToPort: 65535
 
   IngressInterNodeGroupSG:
