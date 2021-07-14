@@ -121,6 +121,8 @@ jobs:
           name: Deploy EKS Nodegroup (Private Subnets)
           no_output_timeout: 15m
           command: |
+            cd .circleci/cloudformation
+
             ./deploy-stack.sh -n udacity-capstone-nodegroup \
               -f stacks/nodegroup.yml -c \
               -t "project=udacity-capstone workflow=${CIRCLE_WORKFLOW_ID}"
