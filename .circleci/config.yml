@@ -3,6 +3,7 @@ orbs:
   aws-cli: circleci/aws-cli@2.0.3
   kubernetes: circleci/kubernetes@0.12.0
   aws-eks: circleci/aws-eks@1.1.0
+  newman: postman/newman@0.0.2
 jobs:
   build:
     docker:
@@ -168,20 +169,24 @@ jobs:
             kubectl apply -f flask-service.yaml
             kubectl apply -f ingress.yml
       - run:
-          name: Append Load Balancer IP to a reference file
+          name: Append Load Balancer IP to a reference file and postman env file
           command: |
-            kubectl get ingress flask-ingress -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}' >> ~/lb_url.txt
+            LB_URL=$(kubectl get ingress flask-ingress -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            
+            echo $LB_URL > lb_url.txt
+            sed -i "s|HOST|${LB_URL}|g" postman/AWS-env.json
       - persist_to_workspace:
-          root:  ~/
+          root: ./
           paths:
             - lb_url.txt
+            - postman/AWS-env.json
   backend-smoke-test:
     docker:
       - image: cimg/base:2021.07
     steps:
       - checkout
       - attach_workspace:
-          at: ~/
+          at: ./
       - run:
           name: Sleep for 2mins to allow App Load Balancer to be provisioned
           command: |
@@ -189,7 +194,7 @@ jobs:
       - run:
           name: Backend smoke test via Load Balancer
           command: |
-            LB_URL=$(cat ~/lb_url.txt)
+            LB_URL=$(cat lb_url.txt)
             if curl -s --retry 5 --retry-connrefused ${LB_URL} | grep "PRODUCTION"
             then
               echo "Currency Exchange API is live!"
@@ -197,6 +202,16 @@ jobs:
               echo "ERROR: API is down. Exiting..."
               exit 1
             fi
+  newman-collection-run:
+    executor: newman/postman-newman-docker
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ./
+      - newman/newman-run:
+          collection: postman/CEX-API-Collection-Tests-Prod.postman_collection.json
+          environment: postman/AWS-env.json
+          iteration-data: postman/test_data.csv
 workflows:
   default:
     jobs:
