@@ -156,6 +156,7 @@ jobs:
       - image: cimg/base:2021.07
     steps: 
       - checkout
+      - aws-cli/install
       - kubernetes/install-kubectl
       - attach_workspace:
           at: ~/.kube
