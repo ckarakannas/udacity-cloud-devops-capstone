@@ -1,0 +1,10 @@
+{
+	"name": "AWS",
+	"values": [
+		{
+			"key": "url",
+			"value": "<<HOST>>",
+			"enabled": true
+		}
+	]
+}
