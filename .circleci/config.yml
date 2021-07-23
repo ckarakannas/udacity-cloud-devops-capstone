@@ -174,7 +174,9 @@ jobs:
             LB_URL=$(kubectl get ingress flask-ingress -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}')
             
             echo $LB_URL > lb_url.txt
-            sed -i "s|HOST|${LB_URL}|g" postman/AWS-env.json
+            cd postman/
+            cp AWS-env-template.json AWS-env.json
+            sed -i "s|HOST|${LB_URL}|g" AWS-env.json
       - persist_to_workspace:
           root: ./
           paths:
