@@ -188,7 +188,7 @@ jobs:
     steps:
       - checkout
       - attach_workspace:
-          at: ./
+          at: ~/project
       - run:
           name: Sleep for 2mins to allow App Load Balancer to be provisioned
           command: |
@@ -209,7 +209,7 @@ jobs:
     steps:
       - checkout
       - attach_workspace:
-          at: ./
+          at: ~/project
       - newman/newman-run:
           collection: postman/CEX-API-Collection-Tests-Prod.postman_collection.json
           environment: postman/AWS-env.json
