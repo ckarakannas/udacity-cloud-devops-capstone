@@ -1,0 +1,242 @@
+{
+	"info": {
+		"_postman_id": "f2929b35-90a1-47f4-98b7-88dd204d115d",
+		"name": "CEX-API-Collection-Tests-Prod",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "/exchange",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"function roundToTwo(num) {    ",
+							"    return +(Math.round(num + \"e+2\")  + \"e-2\");",
+							"}",
+							"",
+							"var jsonData = pm.response.json();",
+							"var convertedResult = pm.iterationData.get(\"converted\");",
+							"",
+							"",
+							"if (jsonData.converted_amount == null)",
+							"{pm.test('Returns error message', function() {",
+							"  pm.expect(jsonData).to.have.property('message');",
+							"});",
+							"",
+							"",
+							"pm.test(\"Unsuccesful POST request\", function () {",
+							"    pm.expect(pm.response.code).to.be.oneOf([400, 404]);",
+							"});",
+							"}",
+							"else",
+							"{pm.test(\"Converted Amount Is Correct\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(roundToTwo(jsonData.converted_amount)).to.eql(convertedResult);",
+							"});",
+							"",
+							"pm.test(\"Successful POST request\", function () {",
+							"    pm.expect(pm.response.code).to.be.oneOf([201,202]);",
+							"}); ",
+							"    ",
+							"}",
+							"",
+							"pm.test(\"Response time is less than 400ms\", function () {",
+							"    pm.expect(pm.response.responseTime).to.be.below(400);",
+							"});",
+							"",
+							""
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n\t\t\"base\": \"{{base}}\",\r\n\t\t\"amount\": 100.00,\r\n\t\t\"target\": \"{{target}}\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{url}}/exchange",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"exchange"
+					]
+				},
+				"description": "Exchange base currency to target currency on predefined conversion rates"
+			},
+			"response": []
+		},
+		{
+			"name": "/exchangeMany",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"function roundToTwo(num) {    ",
+							"    return +(Math.round(num + \"e+2\")  + \"e-2\");",
+							"}",
+							"pm.test(\"Converted Amounts Are Correct\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(roundToTwo(jsonData[0].converted_amount)).to.eql(110.82);",
+							"    pm.expect(roundToTwo(jsonData[2].converted_amount)).to.eql(82.22);",
+							"});",
+							"",
+							"pm.test(\"Correct Response For Non Existent Currency\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData[1].message).to.eql(\"Base currency AUD does not exist in the database.\");",
+							"});",
+							"",
+							"pm.test(\"Response time is less than 400ms\", function () {",
+							"    pm.expect(pm.response.responseTime).to.be.below(400);",
+							"});",
+							"",
+							"pm.test(\"Successful POST request\", function () {",
+							"    pm.expect(pm.response.code).to.be.oneOf([201,202]);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "[{\r\n\t\t\"base\": \"GBP\",\r\n\t\t\"amount\": 100.00,\r\n\t\t\"target\": \"EUR\"\r\n},\r\n{\r\n\t\t\"base\": \"AUD\",\r\n\t\t\"amount\": 100.00,\r\n\t\t\"target\": \"EUR\"\r\n},\r\n{\r\n\t\t\"base\": \"USD\",\r\n\t\t\"amount\": 100.00,\r\n\t\t\"target\": \"EUR\"\r\n}\r\n]\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{url}}/exchangeMany",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"exchangeMany"
+					]
+				},
+				"description": "Exchange base currency to target currency on predefined conversion rates"
+			},
+			"response": []
+		},
+		{
+			"name": "/exchange/{base_currency}",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"function roundToTwo(num) {    ",
+							"    return +(Math.round(num + \"e+2\")  + \"e-2\");",
+							"}",
+							"",
+							"",
+							"var jsonData = pm.response.json();",
+							"var convertedResult = pm.iterationData.get(\"converted\");",
+							"",
+							"",
+							"if (jsonData.converted_amount == null)",
+							"{pm.test('Returns error message', function() {",
+							"  pm.expect(jsonData).to.have.property('message');",
+							"});",
+							"",
+							"",
+							"pm.test(\"Unsuccesful POST request\", function () {",
+							"    pm.expect(pm.response.code).to.be.oneOf([400, 404]);",
+							"});",
+							"}",
+							"else",
+							"{pm.test(\"Converted Amount Is Correct\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(roundToTwo(jsonData.converted_amount)).to.eql(convertedResult);",
+							"});",
+							"",
+							"pm.test(\"Successful POST request\", function () {",
+							"    pm.expect(pm.response.code).to.be.oneOf([201,202]);",
+							"}); ",
+							"    ",
+							"}",
+							"",
+							"pm.test(\"Response time is less than 400ms\", function () {",
+							"    pm.expect(pm.response.responseTime).to.be.below(400);",
+							"});",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n\t\"amount\": 100.00,\r\n\t\"target\": \"{{target}}\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{url}}/exchange/{{base}}",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"exchange",
+						"{{base}}"
+					]
+				},
+				"description": "Exchange a single entry by providing the base currency in the header"
+			},
+			"response": []
+		}
+	]
+}

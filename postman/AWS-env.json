@@ -3,7 +3,7 @@
 	"values": [
 		{
 			"key": "url",
-			"value": "<<HOST>>",
+			"value": "HOST",
 			"enabled": true
 		}
 	]
