@@ -173,22 +173,21 @@ jobs:
           command: |
             LB_URL=$(kubectl get ingress flask-ingress -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}')
             
-            echo $LB_URL > lb_url.txt
+            echo $LB_URL > ~/lb_url.txt
             cd postman/
-            cp AWS-env-template.json AWS-env.json
-            sed -i "s|HOST|${LB_URL}|g" AWS-env.json
+            cp AWS-env-template.json ~/AWS-env.json
+            sed -i "s|HOST|${LB_URL}|g" ~/AWS-env.json
       - persist_to_workspace:
-          root: ./
+          root: ~/
           paths:
             - lb_url.txt
-            - postman/AWS-env.json
+            - AWS-env.json
   backend-smoke-test:
     docker:
       - image: cimg/base:2021.07
     steps:
-      - checkout
       - attach_workspace:
-          at: ~/project
+          at: ~/
       - run:
           name: Sleep for 2mins to allow App Load Balancer to be provisioned
           command: |
@@ -196,7 +195,7 @@ jobs:
       - run:
           name: Backend smoke test via Load Balancer
           command: |
-            LB_URL=$(cat lb_url.txt)
+            LB_URL=$(cat ~/lb_url.txt)
             if curl -s --retry 5 --retry-connrefused ${LB_URL} | grep "PRODUCTION"
             then
               echo "Currency Exchange API is live!"
@@ -209,10 +208,10 @@ jobs:
     steps:
       - checkout
       - attach_workspace:
-          at: ~/project
+          at: ~/
       - newman/newman-run:
           collection: postman/CEX-API-Collection-Tests-Prod.postman_collection.json
-          environment: postman/AWS-env.json
+          environment: ~/AWS-env.json
           iteration-data: postman/test_data.csv
 workflows:
   default:
@@ -228,3 +227,5 @@ workflows:
           requires: [configure-infrastructure]
       - backend-smoke-test:
           requires: [deploy-app]
+      - newman-collection-run:
+          requires: [backend-smoke-test]
