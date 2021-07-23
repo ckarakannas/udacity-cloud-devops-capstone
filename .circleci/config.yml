@@ -67,21 +67,6 @@ jobs:
       - aws-cli/install
       - aws-eks/install-eksctl
       - kubernetes/install-kubectl
-      # - run:
-      #     name: Install eksctl CLI
-      #     command: |
-      #       curl --silent \
-      #         --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-      #       sudo mv /tmp/eksctl /usr/local/bin
-      #       eksctl version
-      # - run:
-      #     name: Install kubectl and export it to path
-      #     command: |
-      #       curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-      #       chmod +x kubectl
-      #       mkdir -p ~/.local/bin/kubectl
-      #       mv ./kubectl ~/.local/bin/kubectl
-      #       echo "export PATH=~/.local/bin/kubectl:$PATH" >> $BASH_ENV
       - run:
           name: Deploy EKS Cluster, Network & Cluster Cloudformation 
           no_output_timeout: 25m
@@ -126,10 +111,10 @@ jobs:
             ./deploy-stack.sh -n udacity-capstone-nodegroup \
               -f stacks/nodegroup.yml -c \
               -t "project=udacity-capstone workflow=${CIRCLE_WORKFLOW_ID}"
-      # - persist_to_workspace:
-      #     root:  ~/.local/bin
-      #     paths:
-      #       - kubectl
+      - persist_to_workspace:
+          root:  ~/.kube
+          paths:
+            - config
   configure-infrastructure:
     docker:
       - image: cimg/base:2021.07
@@ -138,22 +123,8 @@ jobs:
       - aws-cli/install
       - aws-eks/install-eksctl
       - kubernetes/install-kubectl
-      # - run:
-      #     name: Install eksctl CLI
-      #     command: |
-      #       curl --silent \
-      #         --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-      #       sudo mv /tmp/eksctl /usr/local/bin
-      #       eksctl version
-      # - attach_workspace:
-      #     at: ~/.local/bin
-      - run:
-          name: Export path for kubectl
-          command: |
-            # echo "export PATH=~/.local/bin/kubectl:$PATH" >> $BASH_ENV
-            aws eks update-kubeconfig \
-              --region eu-west-2 \
-              --name udacity-cluster
+      - attach_workspace:
+          at: ~/.kube
       - run:
           name: Deploy AWS Load Balancer Controller, if not already deployed
           command: |
@@ -172,7 +143,10 @@ jobs:
               
               cd kubernetes/
               kubectl apply -f aws-load-balancer-controller-v2.2.0.yaml
+              echo "Load balancer Controller has been deployed!"
+              exit 0
             fi
+            echo "Load balancer Controller is already deployed"
       - run:
           name: Check that AWS controller is running
           command: |
@@ -182,23 +156,46 @@ jobs:
       - image: cimg/base:2021.07
     steps: 
       - checkout
-      - aws-cli/install
-      - aws-eks/install-eksctl
       - kubernetes/install-kubectl
+      - attach_workspace:
+          at: ~/.kube
       - run:
           name: Apply kubernetes resources in rolling update fashion
-          command: |
-            # We can persist kubeconfig instead of having to update it all the time
-            # persist workspace at ~/.kube , path config
-            aws eks update-kubeconfig \
-              --region eu-west-2 \
-              --name udacity-cluster
-            
+          command: |        
             cd kubernetes/prod
             kubectl apply -f flask-deployment.yaml
             kubectl apply -f flask-service.yaml
             kubectl apply -f ingress.yml
-
+      - run:
+          name: Append Load Balancer IP to a reference file
+          command: |
+            kubectl get ingress flask-ingress -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}' >> ~/lb_url.txt
+      - persist_to_workspace:
+          root:  ~/
+          paths:
+            - lb_url.txt
+  backend-smoke-test:
+    docker:
+      - image: cimg/base:2021.07
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Sleep for 2mins to allow App Load Balancer to be provisioned
+          command: |
+            sleep 120
+      - run:
+          name: Backend smoke test via Load Balancer
+          command: |
+            LB_URL=$(cat ~/lb_url.txt)
+            if curl -s --retry 5 --retry-connrefused ${LB_URL} | grep "PRODUCTION"
+            then
+              echo "Currency Exchange API is live!"
+            else
+              echo "ERROR: API is down. Exiting..."
+              exit 1
+            fi
 workflows:
   default:
     jobs:
@@ -211,3 +208,5 @@ workflows:
           requires: [deploy-infrastructure]
       - deploy-app:
           requires: [configure-infrastructure]
+      - backend-smoke-test:
+          requires: [deploy-app]
