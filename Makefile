@@ -18,7 +18,15 @@ lint:
 	hadolint Dockerfile
 	find . -type f -name "*.py" | xargs pylint --disable=R,C,W0613
 
-test:
+test-local:
 	newman run postman/CEX-API-Collection-Tests.postman_collection.json \
 		-e postman/Local.postman_environment.json \
 		-d postman/test_data.csv
+
+test:
+	newman run postman/CEX-API-Collection-Tests.postman_collection.json \
+		-e postman/AWS-env.json \
+		-d postman/test_data.csv
+
+validate-cicd:
+	circleci config validate
